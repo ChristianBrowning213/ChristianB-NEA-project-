@@ -1,0 +1,1591 @@
+1. using System;
+2. using System.IO;
+3. using System.Collections.Generic;
+4. using System.ComponentModel;
+5. using System.Data;
+6. using System.Drawing;
+7. using System.Linq;
+8. using System.Text;
+9. using System.Threading.Tasks;
+10. using System.Windows.Forms;
+11. using System.Data.SQLite;
+12.
+13.
+14.
+15. namespace WindowsFormsApp2
+16. {
+17. public partial class Form1 : Form
+18. {
+19. static DataFromSQLTables tables = new DataFromSQLTables();
+20. static TopIDs topIDs = new TopIDs();
+21.
+22.
+23. class SQLCon
+24. {
+25. private string filepath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) +
+"\\CustomerData.db";
+26. public SQLiteDataReader rdr;
+27. private SQLiteConnection conn;
+28. public SQLCon(string Name)
+29. {
+30. string command1 = "SELECT * FROM " + Name;
+31. SQLiteConnection connection = CreateSQLconnection();
+32. var cmd = new SQLiteCommand(command1, connection);
+33. this.rdr = cmd.ExecuteReader();
+34. }
+154
+35.
+36.
+37. public void ExicuteQuery(string CommandText)
+38. {
+39. SQLiteCommand sqlite_cmd;
+40. sqlite_cmd = conn.CreateCommand();
+41. sqlite_cmd.CommandText = CommandText;
+42. Console.WriteLine(CommandText);
+43. sqlite_cmd.ExecuteNonQuery();
+44. }
+45.
+46. public SQLCon()
+47. {
+48. this.conn = new SQLiteConnection(@"Data Source =" + filepath);
+49. conn.Open();
+50. }
+51.
+52. public SQLiteConnection CreateSQLconnection()
+53. {
+54. SQLiteConnection ll = new SQLiteConnection(@"Data Source =" + filepath);
+55. ll.Open();
+56. return ll;
+57. }
+58. }
+59.
+60.
+61. class TopIDs
+62. {
+63. public List<int> CQI = new List<int>();
+64. public List<int> Frequency = new List<int>();
+65. public List<int> MMperDayMoney = new List<int>();
+66. public List<int> MMperDayFrequency = new List<int>();
+67. public List<int> PerTrans = new List<int>();
+68. public List<int> Spent = new List<int>();
+69. public void GetID(string name, List<int> list)
+70. {
+71. SQLCon connection = new SQLCon(name);
+72.
+73. SQLiteDataReader rdr = connection.rdr;
+74. while (rdr.Read())
+75. {
+76. int data = (int)rdr.GetInt32(0);
+77.
+78. Console.WriteLine(data);
+79.
+80. list.Add(data);
+81. }
+82. }
+83. public TopIDs()
+84. {
+85. GetID("CQITop25CQI", CQI);
+86. GetID("CQITop25Frequency", Frequency);
+87. GetID("MoneyMadePerDayTop25Frequencyofsale", MMperDayFrequency);
+88. GetID("MoneyMadePerDayTop25MoneySpent", MMperDayMoney);
+89. GetID("MPPerTransTop25MoneySpent", PerTrans);
+90. GetID("SpentTop25MoneySpentOvertime", Spent);
+91. }
+92. }
+93. class DataFromSQLTables
+94. {
+95. public Dictionary<string, DataTable> Optionlist = new Dictionary<string, DataTable>();
+96. public DataSet SQLtables = new DataSet();
+155
+97.
+98. public DataFromSQLTables()
+99.
+{
+100. CreateLinregTableCustomerID();
+101. CreateSpent();
+102. CreateMPPertrans();
+103. CQI();
+104. FindMMPD();
+105. Mainset();
+106.
+107.
+}
+108. private void CreateLinregTableCustomerID()
+109.
+{
+110. DataTable LinRegtable = new DataTable("CustomerIDRegresion");
+111. string[] dattypes = new string
+[
+6];
+112. string[] Tablenames = new string
+[
+6];
+113.
+114. DataColumn column; //MoneySpent,InvoiceDate,CustomerID
+115.
+116. SQLCon connection = new SQLCon("CustomerIDRegresion");
+117.
+118. SQLiteDataReader rdr = connection.rdr;
+119.
+120. column = new DataColumn();
+121. column.DataType = System.Type.GetType("System.String");
+122. column.ColumnName = "CustomerID"
+;
+123. column.ReadOnly = true
+;
+124. LinRegtable.Columns.Add(column);
+125.
+126. dattypes[
+0] = "VARCHAR"
+;
+127. Tablenames[
+0] = "CustomerID"
+;
+128.
+129. column = new DataColumn();
+130. column.DataType = System.Type.GetType("System.Double");
+131. column.ColumnName = "SlopeXsq"
+;
+132. column.ReadOnly = true
+;
+133. LinRegtable.Columns.Add(column);
+134.
+135. dattypes[
+1] = "DOUBLE"
+;
+136. Tablenames[
+1] = "SlopeXsq"
+;
+137.
+138. column = new DataColumn();
+139. column.DataType = System.Type.GetType("System.Double");
+140. column.ColumnName = "SlopeX"
+;
+141. column.ReadOnly = true
+;
+142. LinRegtable.Columns.Add(column);
+143.
+144. dattypes[
+2] = "DOUBLE"
+;
+145. Tablenames[
+2] = "SlopeX"
+;
+146.
+147. column = new DataColumn();
+148. column.DataType = System.Type.GetType("System.Double");
+149. column.ColumnName = "Yintercept"
+;
+150. column.ReadOnly = true
+;
+151. LinRegtable.Columns.Add(column);
+152.
+153. dattypes[
+3] = "DOUBLE"
+;
+154. Tablenames[
+3] = "Yintercept"
+;
+155.
+156. column = new DataColumn();
+157. column.DataType = System.Type.GetType("System.Double");
+158. column.ColumnName = "RSquared"
+;
+156
+159. column.ReadOnly = true;
+160. LinRegtable.Columns.Add(column);
+161.
+162. dattypes[4] = "DOUBLE";
+163. Tablenames[4] = "RSquared";
+164.
+165. column = new DataColumn();
+166. column.DataType = System.Type.GetType("System.Double");
+167. column.ColumnName = "ProductMomentCorilation";
+168. column.ReadOnly = true;
+169. LinRegtable.Columns.Add(column);
+170.
+171. dattypes[5] = "DOUBLE";
+172. Tablenames[5] = "ProductMomentCorilation";
+173.
+174. DataColumn[] PrimaryKeyColumns = new DataColumn[1];
+175. PrimaryKeyColumns[0] = LinRegtable.Columns["CustomerID"];
+176. LinRegtable.PrimaryKey = PrimaryKeyColumns;
+177.
+178. Tuple<string[], string[]> arrays = Tuple.Create(Tablenames, dattypes);
+179.
+180.
+181. while (rdr.Read())
+182. {
+183. DataRow row;
+184. row = LinRegtable.NewRow();
+185. row["CustomerID"] = rdr.GetString(0);
+186. row["SlopeXsq"] = rdr.GetDouble(1);
+187. row["SlopeX"] = rdr.GetDouble(2);
+188. row["Yintercept"] = rdr.GetDouble(3);
+189. row["RSquared"] = rdr.GetDouble(4);
+190. row["ProductMomentCorilation"] = rdr.GetDouble(5);
+191. LinRegtable.Rows.Add(row);
+192. }
+193. Optionlist.Add(LinRegtable.TableName, LinRegtable);
+194.
+195. SQLtables.Tables.Add(LinRegtable);
+196.
+197.
+198. }
+199. private void CQI()
+200. {
+201. //fill columns
+202. DataColumn column;
+203. DataTable Spent = Optionlist["Spent"];
+204. DataTable MPPerTrans = Optionlist["MPPerTrans"];
+205.
+206. SQLCon connection = new SQLCon("CQI");
+207.
+208. SQLiteDataReader rdr = connection.rdr;
+209.
+210. DataTable CQIData = new DataTable("CQI");
+211.
+212. string[] dattypes = new string[6];
+213. string[] Tablenames = new string[6];
+214.
+215. column = new DataColumn();
+216. column.DataType = System.Type.GetType("System.Int32");
+217. column.ColumnName = "CustomerID";
+218. column.ReadOnly = true;
+219. CQIData.Columns.Add(column);
+220.
+157
+221. dattypes[
+1] = "VARCHAR"
+;
+222. Tablenames[
+1] = "CustomerID"
+;
+223.
+224.
+225.
+226. column = new DataColumn();
+227. column.DataType = System.Type.GetType("System.Double");
+228. column.ColumnName = "MoneySpentOvertime"
+;
+229. column.ReadOnly = true
+;
+230. CQIData.Columns.Add(column);
+231.
+232. dattypes[
+2] = "DECIMAL"
+;
+233. Tablenames[
+2] = "MoneySpentOvertime"
+;
+234.
+235.
+236.
+237. column = new DataColumn();
+238. column.DataType = System.Type.GetType("System.Double");
+239. column.ColumnName = "StandardDiv"
+;
+240. column.ReadOnly = true
+;
+241. CQIData.Columns.Add(column);
+242.
+243. dattypes[
+3] = "DECIMAL"
+;
+244. Tablenames[
+3] = "StandardDiv"
+;
+245.
+246.
+247.
+248. column = new DataColumn();
+249. column.DataType = System.Type.GetType("System.Int32");
+250. column.ColumnName = "Frequency"
+;
+251. column.ReadOnly = true
+;
+252. CQIData.Columns.Add(column);
+253.
+254. dattypes[
+4] = "INTAGAR"
+;
+255. Tablenames[
+4] = "Frequency"
+;
+256.
+257.
+258.
+259. column = new DataColumn();
+260. column.DataType = System.Type.GetType("System.Double");
+261. column.ColumnName = "CQI"
+;
+262. column.ReadOnly = true
+;
+263. CQIData.Columns.Add(column);
+264.
+265. dattypes[
+5] = "DECIMAL"
+;
+266. Tablenames[
+5] = "CQI"
+;
+267.
+268. DataColumn[] PrimaryKeyColumns = new DataColumn[
+1];
+269. PrimaryKeyColumns[
+0] = CQIData.Columns["PrimaryKey"];
+270. CQIData.PrimaryKey = PrimaryKeyColumns;
+271.
+272. DataRow row;
+273.
+274. while (rdr.Read())
+275.
+{
+276. row = CQIData.NewRow();
+277.
+278. row["CustomerID"] = rdr.GetString(
+1);
+279.
+280. row["MoneySpentOvertime"] = rdr.GetDouble(
+2);
+281.
+282. row["StandardDiv"] = rdr.GetDouble(
+3);
+158
+283.
+284. row["Frequency"] = rdr.GetInt16(
+4);
+285.
+286. row["CQI"] = rdr.GetDouble(
+5);
+287.
+288. CQIData.Rows.Add(row);
+289.
+}
+290. Optionlist.Add(CQIData.TableName, CQIData);
+291.
+292. SQLtables.Tables.Add(CQIData);
+293.
+}
+294. private void FindMMPD()
+295.
+{
+296.
+{
+297.
+298. SQLCon connection = new SQLCon("MoneyMadePerDay");
+299.
+300. SQLiteDataReader rdr = connection.rdr;
+301. DataTable MMPerday = new DataTable("MoneyMadePerDay");
+302.
+303. DataColumn column;
+304.
+305.
+306. column = new DataColumn();
+307. column.DataType = System.Type.GetType("System.Int32");
+308. column.ColumnName = "Day"
+;
+309. column.ReadOnly = true
+;
+310. MMPerday.Columns.Add(column);
+311.
+312. column = new DataColumn();
+313. column.DataType = System.Type.GetType("System.Double");
+314. column.ColumnName = "MoneySpent"
+;
+315. column.ReadOnly = false
+;
+316. MMPerday.Columns.Add(column);
+317.
+318. column = new DataColumn();
+319. column.DataType = System.Type.GetType("System.Int32");
+320. column.ColumnName = "Frequencyofsale"
+;
+321. column.ReadOnly = false
+;
+322. MMPerday.Columns.Add(column);
+323.
+324. column = new DataColumn();
+325. column.DataType = System.Type.GetType("System.Int32");
+326. column.ColumnName = "Year"
+;
+327. column.ReadOnly = false
+;
+328. MMPerday.Columns.Add(column);
+329.
+330. DataRow row;
+331.
+332. while (rdr.Read())
+333.
+{
+334.
+335.
+336. row = MMPerday.NewRow();
+337. Console.WriteLine(rdr.GetInt32(
+1));
+338. row["Day"] = rdr.GetInt32(
+1);
+339. row["MoneySpent"] = rdr.GetInt32(
+2);
+340. row["Frequencyofsale"] = rdr.GetInt32(
+3);
+341. row["Year"] = rdr.GetInt32(
+4);
+342.
+343. MMPerday.Rows.Add(row);
+344.
+}
+159
+345.
+346.
+347. Optionlist.Add(MMPerday.TableName, MMPerday);
+348. SQLtables.Tables.Add(MMPerday);
+349.
+350.
+}
+351.
+}
+352.
+353. private void Mainset()
+354.
+{
+355. System.Data.DataTable table = new DataTable("Main");
+356. // Create
+a new DataTable.
+357.
+358. // Declare variables for DataColumn and DataRow objects.
+359. DataColumn column;
+360.
+361.
+362. // Create new DataColumn, set DataType,
+363. // ColumnName and add to DataTable.
+364. column = new DataColumn();
+365. column.DataType = System.Type.GetType("System.Int32");
+366. column.ColumnName = "PrimaryKey"
+;
+367. column.ReadOnly = true
+;
+368. table.Columns.Add(column);
+369.
+370. column = new DataColumn();
+371. column.DataType = System.Type.GetType("System.String");
+372. column.ColumnName = "StockCode"
+;
+373. column.ReadOnly = true
+;
+374. // Add the Column to the DataColumnCollection.
+375. table.Columns.Add(column);
+376.
+377. // Create second column.
+378. column = new DataColumn();
+379. column.DataType = System.Type.GetType("System.String");
+380. column.ColumnName = "Description"
+;
+381. column.ReadOnly = true
+;
+382. // Add the column to the table.
+383. table.Columns.Add(column);
+384.
+385. column = new DataColumn();
+386. column.DataType = System.Type.GetType("System.Int32");
+387. column.ColumnName = "Quantity"
+;
+388. column.ReadOnly = true
+;
+389. table.Columns.Add(column);
+390.
+391. column = new DataColumn();
+392. column.DataType = System.Type.GetType("System.String");
+393. column.ColumnName = "InvoiceDate"
+;
+394. column.ReadOnly = true
+;
+395. table.Columns.Add(column);
+396.
+397. column = new DataColumn();
+398. column.DataType = System.Type.GetType("System.Double");
+399. column.ColumnName = "UnitPrice"
+;
+400. column.ReadOnly = true
+;
+401. table.Columns.Add(column);
+402.
+403. column = new DataColumn();
+404. column.DataType = System.Type.GetType("System.Int32");
+405. column.ColumnName = "CustomerID"
+;
+406. column.ReadOnly = true
+;
+160
+407. table.Columns.Add(column);
+408.
+409. column = new DataColumn();
+410. column.DataType = System.Type.GetType("System.String");
+411. column.ColumnName = "Country";
+412. column.ReadOnly = true;
+413. table.Columns.Add(column);
+414.
+415. column = new DataColumn();
+416. column.DataType = System.Type.GetType("System.String");
+417. column.ColumnName = "InvoiceNo";
+418. column.ReadOnly = true;
+419. table.Columns.Add(column);
+420.
+421. column = new DataColumn();
+422. column.DataType = System.Type.GetType("System.Double");
+423. column.ColumnName = "MoneySpent";
+424. column.ReadOnly = true;
+425. table.Columns.Add(column);
+426.
+427. DataColumn[] PrimaryKeyColumns = new DataColumn[1];
+428. PrimaryKeyColumns[0] = table.Columns["id"];
+429. table.PrimaryKey = PrimaryKeyColumns;
+430.
+431. // Make the ID column the primary key column.
+432.
+433. int y = 1;
+434. DataRow row;
+435. SQLCon con = new SQLCon("CustomerData");
+436. SQLiteDataReader rdr = con.rdr;
+437.
+438. while (rdr.Read())
+439. {
+440. //
+StockCode,Description,Quantity,InvoiceDate,UnitPrice,CustomerID,Country,InvoiceNo,MoneySpent
+441. row = table.NewRow();
+442. row["PrimaryKey"] = y;
+443. row["StockCode"] = rdr.GetString(1);
+444. row["Description"] = rdr.GetString(2);
+445. row["Quantity"] = rdr.GetInt32(3);
+446. row["InvoiceDate"] = rdr.GetString(4);
+447. row["UnitPrice"] = rdr.GetDouble(5);
+448. row["CustomerID"] = rdr.GetInt32(6);
+449. row["Country"] = rdr.GetString(7);
+450. row["InvoiceNo"] = rdr.GetInt32(0);
+451. row["MoneySpent"] = Math.Round((rdr.GetInt32(3) * rdr.GetDouble(5)), 2);
+452. table.Rows.Add(row);
+453.
+454. y++;
+455. }
+456.
+457. Optionlist.Add(table.TableName, table);
+458.
+459. SQLtables.Tables.Add(table);
+460. //return df;
+461. }
+462. private void CreateMPPertrans()
+463. {
+464. DataTable MPPerTrans = new DataTable("MPPerTrans");
+465.
+466. SQLCon connection = new SQLCon("MPPerTrans");
+467.
+161
+468. SQLiteDataReader rdr = connection.rdr;
+469.
+{//creating columns
+470. //
+471. DataColumn column; //MoneySpent,InvoiceDate,CustomerID
+472.
+473. column = new DataColumn();
+474. column.DataType = System.Type.GetType("System.String");
+475. column.ColumnName = "InvoiceNo"
+;
+476. column.ReadOnly = true
+;
+477. MPPerTrans.Columns.Add(column);
+478.
+479. string[] Tablenames = new string
+[
+5];
+480.
+481. string[] dattypes = new string
+[
+5];
+482.
+483. dattypes[
+0] = "VARCHAR"
+;
+484. Tablenames[
+0] = "InvoiceNo"
+;
+485.
+486. column = new DataColumn();
+487. column.DataType = System.Type.GetType("System.Double");
+488. column.ColumnName = "MoneySpent"
+;
+489. column.ReadOnly = true
+;
+490. MPPerTrans.Columns.Add(column);
+491.
+492. dattypes[
+1] = "DOUBLE"
+;
+493. Tablenames[
+1] = "MoneySpent"
+;
+494.
+495. column = new DataColumn();
+496. column.DataType = System.Type.GetType("System.String");
+497. column.ColumnName = "InvoiceDate"
+;
+498. column.ReadOnly = true
+;
+499. MPPerTrans.Columns.Add(column);
+500.
+501. dattypes[
+2] = "VARCHAR"
+;
+502. Tablenames[
+2] = "InvoiceDate"
+;
+503.
+504. column = new DataColumn();
+505. column.DataType = System.Type.GetType("System.Int32");
+506. column.ColumnName = "CustomerID"
+;
+507. column.ReadOnly = true
+;
+508. MPPerTrans.Columns.Add(column);
+509.
+510. dattypes[
+3] = "VARCHAR"
+;
+511. Tablenames[
+3] = "CustomerID"
+;
+512. DataColumn[] PrimaryKeyColumns = new DataColumn[
+1];
+513. PrimaryKeyColumns
+[
+0] = MPPerTrans.Columns["InvoiceNo"];
+514. MPPerTrans.PrimaryKey = PrimaryKeyColumns;
+515.
+516. column = new DataColumn();
+517. column.DataType = System.Type.GetType("System.Int32");
+518. column.ColumnName = "NumericDate"
+;
+519. column.ReadOnly = true
+;
+520. MPPerTrans.Columns.Add(column);
+521.
+522. dattypes[
+4] = "INTAGAR"
+;
+523. Tablenames[
+4] = "NumericDate"
+;
+524.
+525.
+526. column = new DataColumn();
+527. column.DataType = System.Type.GetType("System.Int32");
+528. column.ColumnName = "Year"
+;
+529. column.ReadOnly = true
+;
+162
+530. MPPerTrans.Columns.Add(column);
+531.
+532.
+533.
+}
+534. DataRow row;
+535.
+536. Console.WriteLine(rdr.FieldCount);
+537.
+538. while (rdr.Read())
+539.
+{
+540.
+541. row = MPPerTrans.NewRow();
+542.
+543. row["InvoiceNo"] = rdr.GetString(
+0);
+544. row["MoneySpent"] = rdr.GetDecimal(
+1);
+545. row["InvoiceDate"] = rdr.GetString(
+2);
+546. row["CustomerID"] = rdr.GetString(
+3);
+547. row["NumericDate"] = rdr.GetInt32(
+4);
+548. row["Year"] = rdr.GetInt32(
+5);
+549.
+550. MPPerTrans.Rows.Add(row);
+551.
+}
+552.
+553. Optionlist.Add(MPPerTrans.TableName, MPPerTrans);
+554.
+555. SQLtables.Tables.Add(MPPerTrans);
+556.
+557.
+}
+558.
+559. private void CreateSpent()
+560.
+{
+561. DataTable Spent = new DataTable("Spent");
+562.
+563. SQLCon connection = new SQLCon("Spent");
+564.
+565. SQLiteDataReader rdr = connection.rdr;
+566.
+{//creating columns
+567. //
+568. DataColumn column; //MoneySpent,InvoiceDate,CustomerID
+569.
+570. column = new DataColumn();
+571. column.DataType = System.Type.GetType("System.String");
+572. column.ColumnName = "CustomerID"
+;
+573. column.ReadOnly = true
+;
+574. Spent.Columns.Add(column);
+575.
+576. column = new DataColumn();
+577. column.DataType = System.Type.GetType("System.Double");
+578. column.ColumnName = "MoneySpentOvertime"
+;
+579. column.ReadOnly = true
+;
+580. Spent.Columns.Add(column);
+581.
+582. DataColumn[] PrimaryKeyColumns = new DataColumn[
+1];
+583. PrimaryKeyColumns[
+0] = Spent.Columns["PrimaryKey"];
+584. Spent.PrimaryKey = PrimaryKeyColumns;
+585.
+586.
+587.
+}
+588. DataRow row;
+589.
+590. while (rdr.Read())
+591.
+{
+163
+592. row = Spent.NewRow();
+593. row["CustomerID"] = rdr.GetString(1);
+594. row["MoneySpentOvertime"] = rdr.GetDecimal(2);
+595.
+596. Spent.Rows.Add(row);
+597. }
+598. Optionlist.Add(Spent.TableName, Spent);
+599.
+600.
+601. SQLtables.Tables.Add(Spent);
+602. }
+603.
+604.
+605. }
+606. public Form1()
+607. {
+608.
+609. InitializeComponent();
+610.
+611. dataGridView1.ColumnCount = 2;
+612.
+613. dataGridView1.Columns[0].Name = "CustomerID";
+614.
+615. dataGridView1.Columns[1].Name = "MoneySpentOverall";
+616.
+617. dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+618.
+619.
+620. //dataGridView1.DataSource = tables.Optionlist["Spent"];
+621.
+622.
+623. foreach (DataRow item in tables.Optionlist["Spent"].Rows)
+624. {
+625. dataGridView1.Rows.Add(Convert.ToInt32((string)item.ItemArray[0]),
+Convert.ToInt32((double)item.ItemArray[1]));
+626.
+627. }
+628.
+629.
+630. }
+631.
+632. private void button1_Click(object sender, EventArgs e)
+633. {
+634.
+635. using (StreamReader reader = new StreamReader("MoneyMadePerDay DF 397924"))
+636. {
+637. chart1.Series["ByDay"].Points.Clear();
+638. string line;
+639.
+640. line = reader.ReadLine();
+641. while ((line = reader.ReadLine()) != null)
+642. {
+643.
+644. //x is day
+645. //y is MM
+646.
+647. if (line != null)
+648. {
+649.
+650. string[] DifColumns = line.Split(',');
+651. Console.WriteLine(DifColumns[2]);
+652. double moneymade = Convert.ToDouble(DifColumns[0]);
+164
+653. double day = Convert.ToDouble(DifColumns[2]);
+654. chart1.Series["ByDay"].Points.AddXY(day, moneymade);
+655.
+656. }
+657. }
+658. }
+659. }
+660. private void button2_Click(object sender, EventArgs e)
+661. {
+662.
+663. }
+664.
+665. private void treeView1_AfterSelect(object sender, TreeViewEventArgs e)
+666. {
+667.
+668. }
+669.
+670. private void button3_Click(object sender, EventArgs e)
+671. {
+672. using (StreamReader reader = new StreamReader("MoneyMadePerDay DF 397924"))
+673. {
+674. chart1.Series["ByDay"].Points.Clear();
+675. string line;
+676. line = reader.ReadLine();
+677.
+678. while ((line = reader.ReadLine()) != null)
+679. {
+680.
+681. //x is day
+682. //y is MM
+683.
+684. if (line != null)
+685. {
+686. string[] DifColumns = line.Split(',');
+687. Console.WriteLine(DifColumns[1]);
+688. double frequency = Convert.ToDouble(DifColumns[1]);
+689. double day = Convert.ToDouble(DifColumns[2]);
+690. chart1.Series["ByDay"].Points.AddXY(day, frequency);
+691.
+692.
+693. }
+694. }
+695. }
+696. }
+697.
+698. private void button4_Click(object sender, EventArgs e)
+699. {
+700. using (StreamReader reader = new StreamReader("MoneyMadePerDay DF 397924"))
+701. {
+702. string line;
+703. line = reader.ReadLine();
+704. chart1.Series["ByDay"].Points.Clear();
+705. //chartnameHERE.Series["SeriesNameHERE"].Points.Clear();
+706.
+707. while ((line = reader.ReadLine()) != null)
+708. {
+709.
+710. //x is day
+711. //y is MM
+712.
+713. if (line != null)
+714. {
+165
+715.
+716. string[] DifColumns = line.Split(',');
+717. Console.WriteLine(DifColumns[2]);
+718. double frequency = Convert.ToDouble(DifColumns[1]);
+719. double Moneymade = Convert.ToDouble(DifColumns[0]);
+720. double day = Convert.ToDouble(DifColumns[2]);
+721. double AOV = Moneymade / frequency;
+722. chart1.Series["ByDay"].Points.AddXY(day, AOV);
+723.
+724.
+725. }
+726. }
+727. }
+728. }
+729.
+730. private void chart1_Click(object sender, EventArgs e)
+731. {
+732.
+733. }
+734.
+735. private void chart2_Click(object sender, EventArgs e)
+736. {
+737.
+738. }
+739.
+740. private void button2_Click_1(object sender, EventArgs e)
+741. {
+742. chart2.Series["80/20"].Points.Clear();
+743. using (StreamReader reader = new StreamReader("80 20 rule397924"))
+744. {
+745. reader.ReadLine();
+746. double overall = Convert.ToDouble(reader.ReadLine());
+747. double top25 = Convert.ToDouble(reader.ReadLine());
+748. double bottem75 = overall - top25;
+749. top25 = Math.Round(top25);
+750. bottem75 = Math.Round(bottem75);
+751. chart2.Series["80/20"].Points.AddXY("Bottem75", bottem75);
+752. chart2.Series["80/20"].Points.AddXY("top25", top25);
+753.
+754. }
+755. }
+756.
+757. private void textBox1_TextChanged(object sender, EventArgs e)
+758. {
+759.
+760. }
+761.
+762. private void textBox2_TextChanged(object sender, EventArgs e)
+763. {
+764.
+765. }
+766.
+767.
+768.
+769. private void richTextBox1_TextChanged(object sender, EventArgs e)
+770. {
+771.
+772. }
+773.
+774.
+775.
+776.
+166
+777.
+778.
+779.
+780.
+781.
+782.
+783.
+784.
+785.
+786.
+787.
+788.
+789.
+790. private void button15_Click(object sender, EventArgs e)
+791. {
+792.
+793. }
+794.
+795. private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+796. {
+797.
+798. }
+799.
+800. private void chart1_Click_1(object sender, EventArgs e)
+801. {
+802.
+803. }
+804.
+805. private void button1_Click_1(object sender, EventArgs e)
+806. {
+807.
+808. }
+809.
+810. private void button8_Click_1(object sender, EventArgs e)
+811. {
+812.
+813. }
+814.
+815. private void button16_Click(object sender, EventArgs e)
+816. {
+817.
+818. }
+819.
+820. private void tabPage1_Click(object sender, EventArgs e)
+821. {
+822.
+823. }
+824.
+825. private void tabPage3_Click(object sender, EventArgs e)
+826. {
+827.
+828. }
+829.
+830. private void button8_Click_2(object sender, EventArgs e)
+831. {
+832. tabs.SelectedTab = GraphicsTab;
+833. }
+834.
+835. private void button16_Click_1(object sender, EventArgs e)
+836. {
+837. tabs.SelectedTab = Dataview;
+838. }
+167
+839.
+840. private void button18_Click(object sender, EventArgs e)
+841. {
+842. tabs.SelectedTab = Dataview;
+843. }
+844.
+845. private void button17_Click(object sender, EventArgs e)
+846. {
+847. tabs.SelectedTab = Dataview;
+848. }
+849.
+850. private void textBox3_TextChanged(object sender, EventArgs e)
+851. {
+852.
+853. }
+854.
+855. private void dataGridView1_CellContentClick_1(object sender, DataGridViewCellEventArgs e)
+856. {
+857.
+858. }
+859.
+860. private void button1_Click_2(object sender, EventArgs e)
+861. {
+862.
+863. }
+864.
+865. private void chart1_Click_2(object sender, EventArgs e)
+866. {
+867.
+868. }
+869.
+870. private void button2_Click_2(object sender, EventArgs e)
+871. {
+872.
+873.
+874. //chart7
+875. }
+876.
+877. private void button3_Click_1(object sender, EventArgs e)
+878. {
+879.
+880. }
+881.
+882. private void button4_Click_1(object sender, EventArgs e)
+883. {
+884. chart4.Series["AOV"].Points.Clear();
+885. DataTable MMPD = tables.Optionlist["MoneyMadePerDay"];
+886. int y = 1;
+887. foreach (DataRow item in MMPD.Rows)
+888. {
+889.
+890. // int day = (int)item.ItemArray[0] + 31;
+891. decimal AOV = (decimal)(double)item.ItemArray[1] / (int)item.ItemArray[2];
+892. this.chart4.Series["AOV"].Points.AddXY(y, AOV);
+893. y++;
+894. }
+895.
+896.
+897. }
+898.
+899. private void button19_Click(object sender, EventArgs e)
+900. {
+168
+901.
+902. }
+903. private void Form1_Load(object sender, EventArgs e)
+904. {
+905. //MoneySpent graph per day
+906.
+907. DataFromSQLTables tables = new DataFromSQLTables();
+908.
+909. TopIDs ids = new TopIDs();
+910.
+911.
+912.
+913.
+914.
+915. }
+916.
+917. private void SpentScatter()
+918. {
+919.
+920. chart3.Series["MoneySpentOverall"].Points.Clear();
+921. DataTable spent = tables.Optionlist["Spent"];
+922. DataTable Trans = tables.Optionlist["MPPerTrans"];
+923. foreach (DataRow item in spent.Rows)
+924. {
+925. if ((double)item.ItemArray[1]>5000)
+926. {
+927.
+928. }
+929. else
+930. {
+931.
+932. DataRow[] rows = Trans.Select("CustomerID= '" + item.ItemArray[0] + "'");
+933. double money = (double)item.ItemArray[1];
+934.
+935. chart3.Series["MoneySpentOverall"].Points.AddXY(money, rows.Length);
+936. }
+937. }
+938. }
+939. private Tuple<double, double> Tally2080(DataTable Spent, List<int> Top25)
+940. {
+941. double Twenty = 0;
+942. double Sevintyfive = 0;
+943.
+944. foreach (DataRow item in Spent.Rows)
+945. {
+946. if (Top25.Contains(Convert.ToInt32(item.ItemArray[0])))
+947. {
+948. Twenty = Twenty + (double)item.ItemArray[1];
+949. }
+950. else
+951. {
+952. Sevintyfive = Sevintyfive + (double)item.ItemArray[1];
+953. }
+954. }
+955. Tuple<double, double> T = new Tuple<double, double>(Twenty, Sevintyfive);
+956. return T;
+957. }
+958.
+959. private void button1_Click_3(object sender, EventArgs e)
+960. {
+961. chart1.Series["ByDayM"].Points.Clear();
+962. chart1.Series["ByDayF"].Points.Clear();
+169
+963. DataTable MMPD = tables.Optionlist["MoneyMadePerDay"];
+964. int y = 1;
+965. foreach (DataRow item in MMPD.Rows)
+966. {
+967. this.chart1.Series["ByDayM"].Points.AddXY(y, (double)item.ItemArray[1]);
+968. this.chart1.Series["ByDayF"].Points.AddXY(y, (int)item.ItemArray[2]);
+969. y++;
+970. }
+971.
+972.
+973. }
+974.
+975. private void button6_Click(object sender, EventArgs e)
+976. {
+977.
+978. SpentScatter();
+979. }
+980.
+981. private void chart3_Click(object sender, EventArgs e)
+982. {
+983.
+984. }
+985.
+986. private void button5_Click(object sender, EventArgs e)
+987. {
+988. chart2.Series["80/20"].Points.Clear();
+989. TopIDs topIDs = new TopIDs();
+990. Tuple<double, double> Sevinty25 = Tally2080(tables.Optionlist["Spent"], topIDs.Spent);
+991.
+992. chart2.Series["80/20"].Points.AddXY("Bottem75", Sevinty25.Item2);
+993. chart2.Series["80/20"].Points.AddXY("top25", Sevinty25.Item1);
+994.
+995. }
+996.
+997. private void listBox1_SelectedIndexChanged(object sender, EventArgs e)
+998. {
+999.
+1000. }
+1001.
+1002. private void CQI_Click(object sender, EventArgs e)
+1003. {
+1004. dataGridView2.Columns.Clear();
+1005. dataGridView2.DataSource = tables.Optionlist["CQI"];
+1006.
+1007. }
+1008.
+1009. private void button9_Click(object sender, EventArgs e)
+1010. {
+1011. dataGridView2.Columns.Clear();
+1012. dataGridView2.DataSource = tables.Optionlist["Main"];
+1013. }
+1014.
+1015. private void button10_Click(object sender, EventArgs e)
+1016. {
+1017. dataGridView2.Columns.Clear();
+1018. dataGridView2.DataSource = tables.Optionlist["MoneyMadePerDay"];
+1019. }
+1020.
+1021. private void button7_Click(object sender, EventArgs e)
+1022. {
+1023. dataGridView2.Columns.Clear();
+1024. dataGridView2.DataSource = tables.Optionlist["MPPerTrans"];
+170
+1025. }
+1026.
+1027. private void button11_Click(object sender, EventArgs e)
+1028. {
+1029.
+1030. }
+1031.
+1032. private void maskedTextBox1_MaskInputRejected(object sender, MaskInputRejectedEventArgs
+e)
+1033. {
+1034.
+1035. }
+1036.
+1037. private void button12_Click(object sender, EventArgs e)
+1038. {
+1039.
+1040.
+1041.
+1042.
+1043.
+1044.
+1045. }
+1046.
+1047. private void dataGridView1_CellContentClick_2(object sender, DataGridViewCellEventArgs e)
+1048. {
+1049.
+1050. }
+1051.
+1052.
+1053. private double MakeEquation(DataRow row, int day)
+1054. {
+1055. double SlopeSQ = (double)row.ItemArray[1];
+1056.
+1057. double slopex = (double)row.ItemArray[2];
+1058.
+1059. double Yint = (double)row.ItemArray[3];
+1060.
+1061. double Ypooint = (SlopeSQ * (day * day)) + (slopex * day) + Yint;
+1062.
+1063. return Ypooint;
+1064. }
+1065.
+1066.
+1067.
+1068. private void showEquation(string Customerid)
+1069. {
+1070. // this section is to present the transaction huistory on a graph and if applicable write its linear
+regression equation along side it
+1071. chart5.Series["Transaction history"].Points.Clear();
+1072. chart5.Series["Equation"].Points.Clear();
+1073.
+1074. DataTable Spent = tables.Optionlist["Spent"];
+1075. DataTable linregtable = tables.Optionlist["CustomerIDRegresion"];
+1076. DataRow[] CustomerLinreg = linregtable.Select("CustomerID= '" + Customerid + "'");
+1077.
+1078. if (CustomerLinreg.Length > 0)
+1079. {
+1080. DataTable Trans = tables.Optionlist["MPPerTrans"];
+1081. DataRow[] DRows = Trans.Select("CustomerID= '" + Customerid + "'");
+1082. int x = 0;
+1083. foreach (DataRow item in DRows)
+1084. {
+171
+1085. chart5.Series["Transaction history"].Points.AddXY((int)item.ItemArray[4],
+(double)item.ItemArray[1]);
+1086.
+1087. if ((double)CustomerLinreg[0].ItemArray[1] == 0 &&
+(double)CustomerLinreg[0].ItemArray[2] == 0
+1088. && (double)CustomerLinreg[0].ItemArray[3] == 0)
+1089. {
+1090. }
+1091. else
+1092. {
+1093. chart5.Series["Equation"].Points.AddXY((int)item.ItemArray[4],
+MakeEquation(CustomerLinreg[0], x));
+1094. x++;
+1095. }
+1096. }
+1097.
+1098. dataGridView3.DataSource = null;
+1099. dataGridView3.ColumnCount = 4;
+1100. dataGridView3.Columns[0].Name = "X^2";
+1101. dataGridView3.Columns[1].Name = "X";
+1102. dataGridView3.Columns[2].Name = "Y-int";
+1103. dataGridView3.Columns[3].Name = "R^2";
+1104. DataGridViewRow row = (DataGridViewRow)dataGridView3.Rows[0].Clone();
+1105. row.Cells[0].Value = CustomerLinreg[0].ItemArray[1];
+1106. row.Cells[1].Value = CustomerLinreg[0].ItemArray[2];
+1107. row.Cells[2].Value = CustomerLinreg[0].ItemArray[3];
+1108. row.Cells[3].Value = CustomerLinreg[0].ItemArray[4];
+1109.
+1110. dataGridView3.Rows.Add(row);
+1111. decimal[] Equation = new decimal[2] {
+(decimal)Convert.ToDecimal((double)CustomerLinreg[0].ItemArray[1])
+1112. ,
+(decimal)Convert.ToDecimal((double)CustomerLinreg[0].ItemArray[2]) };
+1113. decimal gradient = GetGradient(Equation, DRows.Length-1);
+1114. if (gradient > 0)
+1115. {
+1116. richTextBox1.Text = "Model predicts a increase in future transaction value";
+1117. }
+1118. else if (gradient < 0)
+1119. {
+1120. richTextBox1.Text = "Model predicts a Decrease in future transaction value";
+1121. }
+1122. }
+1123. else
+1124. {
+1125. richTextBox1.Text = "Graph not avalible insificiant data";
+1126. }
+1127.
+1128. }
+1129.
+1130. private void button13_Click(object sender, EventArgs e)
+1131. {
+1132.
+1133. DataTable Spent = tables.Optionlist["Spent"];
+1134.
+1135. DataRow[] Tesrows = Spent.Select("CustomerID= '" + (string)textBox2.Text + "'");
+1136.
+1137. if (Tesrows.Length > 0)
+1138. {
+1139.
+1140. showEquation((string)textBox2.Text);
+1141.
+172
+1142. if (dataGridView2.DataSource != null)
+1143. {
+1144.
+1145.
+1146. List<DataGridViewRow> rows = new List<DataGridViewRow>();
+1147.
+1148. if (dataGridView2.Columns[0].Name == "CustomerID" &&
+dataGridView2.Columns[1].Name!= "SlopeXsq")
+1149. {
+1150.
+1151. int y = 0;
+1152. for (int i = 0; i < dataGridView2.Rows.Count - 1; i++)
+1153. {
+1154.
+1155. Console.WriteLine(y);
+1156. if (dataGridView2.Rows[i].Cells[0].Value.ToString().Equals((string)textBox2.Text))
+1157. {
+1158. DataGridViewRow row = (DataGridViewRow)dataGridView2.Rows[i].Clone();
+1159.
+1160. for (int j = 0; j < dataGridView2.Rows[i].Cells.Count; j++)
+1161. {
+1162. row.Cells[j].Value = dataGridView2.Rows[i].Cells[j].Value;
+1163. }
+1164. rows.Add(dataGridView2.Rows[i]);
+1165. dataGridView2.FirstDisplayedScrollingRowIndex = i;
+1166. }
+1167. y++;
+1168. }
+1169.
+1170. dataGridView2.DataSource = null;
+1171. dataGridView2.Rows.Clear();
+1172.
+1173. dataGridView2.ColumnCount = 5;
+1174.
+1175. dataGridView2.Columns[0].Name = "CustomerID";
+1176. dataGridView2.Columns[1].Name = "MoneySpentOvertime";
+1177. dataGridView2.Columns[2].Name = "StandardDiv";
+1178. dataGridView2.Columns[3].Name = "Frequency";
+1179. dataGridView2.Columns[4].Name = "CQI";
+1180.
+1181. foreach (DataGridViewRow item in rows)
+1182. {
+1183. dataGridView2.Rows.Add(item);
+1184. }
+1185.
+1186. }
+1187. else if (dataGridView2.Columns[0].Name == "InvoiceNo")
+1188. {
+1189.
+1190. int y = 0;
+1191. for (int i = 0; i < dataGridView2.Rows.Count - 1; i++)
+1192. {
+1193.
+1194. Console.WriteLine(y);
+1195. if (dataGridView2.Rows[i].Cells[3].Value.ToString().Equals((string)textBox2.Text))
+1196. {
+1197. DataGridViewRow row = (DataGridViewRow)dataGridView2.Rows[i].Clone();
+1198.
+1199. for (int j = 0; j < dataGridView2.Rows[i].Cells.Count; j++)
+1200. {
+1201. row.Cells[j].Value = dataGridView2.Rows[i].Cells[j].Value;
+1202. }
+173
+1203.
+1204. rows.Add(row);
+1205.
+1206. }
+1207. y++;
+1208. }
+1209.
+1210. dataGridView2.DataSource = null;
+1211.
+1212. dataGridView2.ColumnCount = 6;
+1213.
+1214. dataGridView2.Columns[0].Name = "InvoiceNo";
+1215. dataGridView2.Columns[1].Name = "MoneySpent";
+1216. dataGridView2.Columns[2].Name = "InvoiceDate";
+1217. dataGridView2.Columns[3].Name = "CustomerID";
+1218. dataGridView2.Columns[4].Name = "NumericDate";
+1219. dataGridView2.Columns[5].Name = "Year";
+1220.
+1221. foreach (DataGridViewRow item in rows)
+1222. {
+1223. dataGridView2.Rows.Add(item);
+1224. }
+1225.
+1226. }
+1227. else if (dataGridView2.Columns[0].Name == "PrimaryKey")
+1228. {
+1229. int y = 0;
+1230. for (int i = 0; i < dataGridView2.Rows.Count - 1; i++)
+1231. {
+1232.
+1233. Console.WriteLine(y);
+1234. if (dataGridView2.Rows[i].Cells[6].Value.ToString().Equals((string)textBox2.Text))
+1235. {
+1236.
+1237. DataGridViewRow row = (DataGridViewRow)dataGridView2.Rows[i].Clone();
+1238.
+1239. for (int j = 0; j < dataGridView2.Rows[i].Cells.Count; j++)
+1240. {
+1241. row.Cells[j].Value = dataGridView2.Rows[i].Cells[j].Value;
+1242. }
+1243.
+1244. rows.Add(row);
+1245. dataGridView2.FirstDisplayedScrollingRowIndex = i;
+1246. }
+1247. y++;
+1248. }
+1249.
+1250. dataGridView2.DataSource = null;
+1251.
+1252. dataGridView2.ColumnCount = 10;
+1253.
+1254. dataGridView2.Columns[0].Name = "Primarykey";
+1255. dataGridView2.Columns[1].Name = "InvoiceNo";
+1256. dataGridView2.Columns[2].Name = "StockCode";
+1257. dataGridView2.Columns[3].Name = "Description";
+1258. dataGridView2.Columns[4].Name = "Quantity";
+1259. dataGridView2.Columns[5].Name = "InvoiceDate";
+1260. dataGridView2.Columns[6].Name = "UnitPrice";
+1261. dataGridView2.Columns[7].Name = "CustomerID";
+1262. dataGridView2.Columns[8].Name = "Country";
+1263. dataGridView2.Columns[9].Name = "MoneySpent";
+1264.
+174
+1265. foreach (DataGridViewRow item in rows)
+1266. {
+1267. dataGridView2.Rows.Add(item);
+1268. }
+1269.
+1270.
+1271. }
+1272. }
+1273. }
+1274.
+1275. }
+1276.
+1277. private void dataGridView2_CellContentClick(object sender, DataGridViewCellEventArgs e)
+1278. {
+1279.
+1280. }
+1281.
+1282. private void chart5_Click(object sender, EventArgs e)
+1283. {
+1284.
+1285. }
+1286.
+1287. private void dataGridView3_CellContentClick(object sender, DataGridViewCellEventArgs e)
+1288. {
+1289.
+1290. }
+1291. private decimal GetGradient(decimal[] equation, decimal Xvalue)
+1292. {
+1293. decimal Xsq = equation[0];
+1294. decimal x = equation[1];
+1295.
+1296. decimal gradient = (2m * Xsq) * (Xvalue) + x;
+1297.
+1298. return gradient;
+1299. }
+1300.
+1301. private void button3_Click_2(object sender, EventArgs e)
+1302. {
+1303. chart6.Series["RS"].Points.Clear();
+1304. DataTable CustomerLinreg = tables.Optionlist["CustomerIDRegresion"];
+1305. DataTable Trans = tables.Optionlist["MPPerTrans"];
+1306.
+1307. int pos = 0;
+1308. int neg = 0;
+1309. foreach (DataRow item in CustomerLinreg.Rows)
+1310. {
+1311.
+1312. if ((double)item.ItemArray[1] == 0 && (double)item.ItemArray[2] == 0 &&
+(double)item.ItemArray[3] == 0)
+1313. {
+1314.
+1315. }
+1316. else
+1317. {
+1318. DataRow[] rows = Trans.Select("CustomerID= '" + (string)item.ItemArray[0] + "'");
+1319.
+1320. decimal[] Equation = new decimal[2] {
+(decimal)Convert.ToDecimal((double)item.ItemArray[1])
+1321. , (decimal)Convert.ToDecimal((double)item.ItemArray[2]) };
+1322.
+1323. decimal Gradient = GetGradient(Equation, rows.Length - 1);
+1324. if (Gradient > 0m)
+175
+1325. {
+1326. pos++;
+1327. }
+1328. else if(Gradient < 0)
+1329. {
+1330. neg++;
+1331. }
+1332. }
+1333. }
+1334.
+1335. chart6.Series["RS"].Points.AddXY("Rising values", pos);
+1336. chart6.Series["RS"].Points.AddXY("Falling values", neg);
+1337.
+1338. }
+1339.
+1340. private void button12_Click_1(object sender, EventArgs e)
+1341. {
+1342. chart6.Series["RS"].Points.Clear();
+1343. DataTable CustomerLinreg = tables.Optionlist["CustomerIDRegresion"];
+1344. DataTable Trans = tables.Optionlist["MPPerTrans"];
+1345. List<int> Top25 = topIDs.Spent;
+1346. int pos = 0;
+1347. int neg = 0;
+1348. foreach (DataRow item in CustomerLinreg.Rows)
+1349. {
+1350. if (Top25.Contains( Convert.ToInt32((string)item.ItemArray[0])))
+1351. {
+1352. if ((double)item.ItemArray[1] == 0 && (double)item.ItemArray[2] == 0 &&
+(double)item.ItemArray[3] == 0)
+1353. {
+1354.
+1355. }
+1356. else
+1357. {
+1358. DataRow[] rows = Trans.Select("CustomerID= '" + (string)item.ItemArray[0] + "'");
+1359.
+1360. decimal[] Equation = new decimal[2] {
+(decimal)Convert.ToDecimal((double)item.ItemArray[1]),
+(decimal)Convert.ToDecimal((double)item.ItemArray[2]) };
+1361.
+1362. decimal Gradient = GetGradient(Equation, rows.Length - 1);
+1363. if (Gradient > 0m)
+1364. {
+1365. pos++;
+1366. }
+1367. else if (Gradient < 0)
+1368. {
+1369. neg++;
+1370. }
+1371. }
+1372. }
+1373. }
+1374.
+1375. chart6.Series["RS"].Points.AddXY("Rising values", pos);
+1376. chart6.Series["RS"].Points.AddXY("Falling values", neg);
+1377.
+1378.
+1379. }
+1380.
+1381. private void button2_Click_3(object sender, EventArgs e)
+1382. {
+1383. dataGridView2.Columns.Clear();
+176
+1384. dataGridView2.DataSource = tables.Optionlist["CustomerIDRegresion"];
+1385. }
+1386. }
+1387. }
