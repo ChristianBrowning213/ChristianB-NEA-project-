@@ -1,0 +1,1157 @@
+1. using System;
+2. using System.Data.SQLite;
+3. using System.Collections.Generic;
+4. using System.IO;
+5. using System.Data;
+6. namespace Linear_regression
+7. {
+8. class SQLCon
+9. {
+10. const int amountofdataRows = 3000;
+11. private string filepath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
++ "\\CustomerData.db";
+12. public SQLiteDataReader reader;
+13. public SQLCon(string Name)
+14. {
+15. string command1 = "SELECT * FROM "+Name;
+16.
+17. SQLiteConnection connection = new SQLiteConnection(@"Data Source =" + filepath);
+18. connection.Open();
+19. using var cmd = new SQLiteCommand(command1, connection);//needs to be redone
+20. //write a cross table tabulation
+21. this.reader = cmd.ExecuteReader();
+22. }
+23.
+24. private SQLiteConnection conn;
+25. public void ExicuteQuery(string CommandText)
+26. {
+27. SQLiteCommand sqlite_cmd;
+28. sqlite_cmd = conn.CreateCommand();
+29. sqlite_cmd.CommandText = CommandText;
+30. Console.WriteLine(CommandText);
+31. sqlite_cmd.ExecuteNonQuery();
+32. }
+33.
+34. public SQLCon()//works as a methood used within the exicution
+35. {
+36. this.conn = new SQLiteConnection(@"Data Source =" + filepath);
+37. conn.Open();
+38. }
+39.
+40.
+41. }
+42. class Datacreated
+43. {
+44. Dictionary<DataTable, Tuple<string[], string[]>> TableNamesDatatypes = new
+Dictionary<DataTable, Tuple<string[], string[]>>();
+45.
+46.
+47.
+177
+48. public void SaveToSQL(DataTable Sheet)
+49. {
+50. if (Sheet.Rows.Count ==0)
+51. {
+52.
+53. }
+54. else
+55. {
+56. SaveData(Sheet);
+57. InsertData(Sheet);
+58. }
+59.
+60. }
+61. private void SaveData(DataTable Sheet)
+62. {
+63. SQLCon link = new SQLCon();
+64.
+65. string CreateTable2 = "drop table if exists " + Sheet.TableName;
+66. Console.WriteLine(CreateTable2);
+67. link.ExicuteQuery(CreateTable2);
+68.
+69. string CreateTable = "CREATE TABLE" + " " + Sheet.TableName + "( " +
+MakeColumsreadyForSQL(false, Sheet) + " );"; ;
+70. Console.WriteLine(CreateTable);
+71.
+72. link.ExicuteQuery(CreateTable);
+73.
+74. }
+75. private string MakeColumsreadyForSQL(bool Rows, DataTable Sheet)
+76. // has a bool to see if this is for the insert or not as the data types are used
+77. // to create the table but not when inserting
+78. {
+79.
+80. string[] Datatypes = TableNamesDatatypes[Sheet].Item2;
+81.
+82. string data = "";
+83. for (int i = 0; i < Sheet.Columns.Count; i++)
+84. {
+85. if (i == (Sheet.Columns.Count - 1))
+86. {
+87. if (Rows == true)
+88. {
+89. data = data + Sheet.Columns[i].ColumnName + " ";
+90. }
+91. else
+92. {
+93. data = data + Sheet.Columns[i].ColumnName + " " + Datatypes[i];
+94. }
+95. }
+96. else
+97. {
+98. if (Rows == true)
+99. {
+100. data = data + Sheet.Columns[i].ColumnName + "," + " ";
+101. }
+102. else
+103. {
+104. data = data + Sheet.Columns[i].ColumnName + " " + Datatypes[i] + ", ";
+105. }
+106. }
+107. }
+108. return data;
+109. }
+110.
+111.
+112. private string MakeRowsReadyforSQL(int i, DataTable Sheet)
+113. {
+178
+114. string data = "";
+115. for (int j = 0; j < Sheet.Columns.Count; j++)
+116. {
+117. if (j == (Sheet.Columns.Count - 1))
+118. {
+119. data = data + Sheet.Rows[i].ItemArray[j];
+120. }
+121. else
+122. {
+123. data = data + Sheet.Rows[i].ItemArray[j] + ", ";
+124. }
+125. }
+126. return data;
+127. }
+128. private void InsertData(DataTable Sheet)
+129. {
+130. SQLCon link = new SQLCon();
+131. for (int i = 0; i < Sheet.Rows.Count; i++)
+132. {
+133. string InsertText = "INSERT INTO" + " " + Sheet.TableName + "( " +
+MakeColumsreadyForSQL(true, Sheet) + ")"
+134. + " VALUES(" + MakeRowsReadyforSQL(i,Sheet) + "); ";
+135. Console.WriteLine(InsertText);
+136. link.ExicuteQuery(InsertText);
+137. }
+138. }
+139. public void FillLinregTableDays(DataTable MMperDay, ref DataTable QuatersMoney, ref
+DataTable QuatersFreq)
+140. {
+141. //now first we must seperate the dates between quarters
+142. // We will overall have 365 data points however for testing I need to break up any data
+inputted into quarters
+143. List<int> days = new List<int>();
+144. MMperDay.DefaultView.Sort=("Day"); // places them in order of Days
+145. foreach (DataRow item in MMperDay.Rows)
+146. {
+147. days.Add((int)item.ItemArray[1]);
+148. }
+149. if (days.Count <4) // if the number of days in the system is lower than 4 quaters aren't
+possible
+150. {
+151. }
+152. else
+153. {
+154. double quarter = (days.Count / 4);
+155. int Q = Convert.ToInt16(Math.Round(quarter));
+156.
+157. Tuple<List<decimal>, List<decimal>, List<decimal>> Q1 = Tally(0, Q, MMperDay);
+158. Tuple<List<decimal>, List<decimal>, List<decimal>> Q2 = Tally(Q, Q, MMperDay);
+159. Tuple<List<decimal>, List<decimal>, List<decimal>> Q3 = Tally(Q + Q, Q, MMperDay);
+160. Tuple<List<decimal>, List<decimal>, List<decimal>> Q4 = Tally(Q + Q + Q, Q,
+MMperDay);
+161. Tuple<List<decimal>, List<decimal>, List<decimal>>[] quaters = new
+Tuple<List<decimal>, List<decimal>, List<decimal>>[4];
+162. quaters[0] = Q1;
+163. quaters[1] = Q2;
+164. quaters[2] = Q3;
+165. quaters[3] = Q4;
+166. int index = 1;
+167. foreach (var item in quaters)
+168. {// all the data should be sorted and connected in order as they where added to a list at
+the same time with
+169. // no operations completing between them that effect order
+170. decimal[] day = item.Item1.ToArray();
+171. decimal[] Money = item.Item2.ToArray();
+172. decimal[] Freq = item.Item3.ToArray();
+173. LinearRegression money = new LinearRegression(Money, day);
+179
+174. decimal[] valuesM = money.ReturnValues();
+175. DataRow rowM;
+176. rowM = QuatersMoney.NewRow();
+177. rowM["Quater"] = index;
+178.
+179. rowM["SlopeXsq"] = valuesM[2];
+180. rowM["SlopeX"] = valuesM[1];
+181. rowM["Yintercept"] = valuesM[0];
+182. rowM["RSquared"] = valuesM[3];
+183. rowM["ProductMomentCorilation"] = valuesM[4];
+184. QuatersMoney.Rows.Add(rowM);
+185. LinearRegression Frequency = new LinearRegression(Freq, day);
+186. decimal[] valuesF = Frequency.ReturnValues();
+187. DataRow rowF;
+188. rowF = QuatersFreq.NewRow();
+189. rowF["Quater"] = index;
+190.
+191. rowF["SlopeXsq"] = valuesF[2];
+192. rowF["SlopeX"] = valuesF[1];
+193. rowF["Yintercept"] = valuesF[0];
+194. rowF["RSquared"] = valuesF[3];
+195. rowF["ProductMomentCorilation"] = valuesF[4];
+196. QuatersFreq.Rows.Add(rowF);
+197.
+198. index++;
+199. }
+200. }
+201. }
+202. private Tuple<List<decimal>, List<decimal>, List<decimal>> Tally(int day, int quarter,
+DataTable MMperDay)
+203. {
+204. List<decimal> Day = new List<decimal>();
+205. List<decimal> Money = new List<decimal>();
+206. List<decimal> Freq = new List<decimal>();
+207. int NumberOfDays = day + quarter;
+208. while (NumberOfDays >= MMperDay.Rows.Count)
+209. // this is to make sure this for loop doesnt exeed the bounds of the array as the quater
+might be
+210. // larger than a quater as the size of the data inpiutted during testing is flexible
+211. {
+212. NumberOfDays--;
+213. }
+214. for (int i = day; i < NumberOfDays; i++)
+215. {
+216. Day.Add((decimal)Convert.ToDecimal(MMperDay.Rows[i].ItemArray[1]));
+217. Money.Add((decimal)Convert.ToDecimal(MMperDay.Rows[i].ItemArray[2]));
+218. Freq.Add((decimal)Convert.ToDecimal(MMperDay.Rows[i].ItemArray[3]));
+219. }
+220. Tuple<List<decimal>, List<decimal>, List<decimal>> data = new Tuple<List<decimal>,
+List<decimal>, List<decimal>>(Day, Money, Freq);
+221. return data;
+222. }
+223.
+224. public void FillLinregTableCustomer(DataTable Spent, DataTable MMPerTrans, ref DataTable
+Linreg)
+225. {
+226. for (int i = 0; i < Spent.Rows.Count; i++) // need to tally them into days to get accurate data
+227. { // uses Spent Datable as a store of CustomerID
+228. Console.WriteLine(Spent.Rows[i].ItemArray[1]);
+229. DataRow[] Found = MMPerTrans.Select("CustomerID = '" +
+(string)Spent.Rows[i].ItemArray[1] + "'");
+230. //*** Gets a array of rows that have the peice of data within Spent.Rows[i].ItemArray[1]
+231. // Casts to string as the Spent.Rows[i].ItemArray[1] is treated as a object that has edata
+within it
+232.
+233. if (Found.Length > 1) // this is to check if the minimum amount of data required is found
+aka more than 1
+180
+234. {
+235.
+236. List<double> Money = new List<double>();
+237. Dictionary<int, double> DayToMoney = new Dictionary<int, double>();
+238. //utalizes the normalized date that makes 2016 date negative
+239. //dictionary structure to link day to the tally of money spent
+240. foreach (DataRow item in Found) //goes through each datarow and adding a tally of
+money spent
+241. {
+242.
+243. Money.Add((double)item.ItemArray[1]);
+244.
+245. }
+246. // setting up data for the perpouses of the graph
+247. decimal[] xValues = new decimal[Money.Count];
+248.
+249. decimal[] yValues = new decimal[Money.Count];
+250. for (int j = 0; j < Money.Count; j ++)
+251. {
+252. xValues[j] =j; // X values exit in relation to echother not Time as this simplifies
+253. // the scale of each graph so that their equations canbe presented
+254. // easily on the same chart with no normalization of scale
+255. yValues[j] = (decimal)Money[j];
+256. }
+257.
+258. LinearRegression Regresion = new LinearRegression(yValues, xValues);
+259. // Loads the two data axis to the LinRegression Constructor
+260. decimal[] values = Regresion.ReturnValues();
+261.
+262. //Creates new data row in Datatable
+263. DataRow row;
+264. row = Linreg.NewRow();
+265. row["CustomerID"] = Spent.Rows[i].ItemArray[1];
+266. row["SlopeXsq"] = values[2];
+267. row["SlopeX"] = values[1];
+268. row["Yintercept"] = values[0];
+269. row["RSquared"] = values[3];
+270. row["ProductMomentCorilation"] = values[4];
+271. Linreg.Rows.Add(row);
+272. }
+273.
+274. }
+275. }
+276. public DataTable CreateLinregTableDays(string sheetname)
+277. {
+278. DataTable LinRegtable = new DataTable(sheetname);
+279.
+280.
+281.
+282.
+283. string[] dattypes = new string[6];
+284. string[] Tablenames = new string[6];
+285. {//creating columns
+286. //
+287. DataColumn column; //MoneySpent,InvoiceDate,CustomerID
+288.
+289. column = new DataColumn();
+290. column.DataType = System.Type.GetType("System.String");
+291. column.ColumnName = "Quater";
+292. column.ReadOnly = true;
+293. LinRegtable.Columns.Add(column);
+294.
+295. dattypes[0] = "VARCHAR";
+296. Tablenames[0] = "CustomerID";
+297.
+298. column = new DataColumn();
+299. column.DataType = System.Type.GetType("System.Double");
+181
+300. column.ColumnName = "SlopeXsq";
+301. column.ReadOnly = true;
+302. LinRegtable.Columns.Add(column);
+303.
+304. dattypes[1] = "DOUBLE";
+305. Tablenames[1] = "SlopeXsq";
+306.
+307. column = new DataColumn();
+308. column.DataType = System.Type.GetType("System.Double");
+309. column.ColumnName = "SlopeX";
+310. column.ReadOnly = true;
+311. LinRegtable.Columns.Add(column);
+312.
+313. dattypes[2] = "DOUBLE";
+314. Tablenames[2] = "SlopeX";
+315.
+316. column = new DataColumn();
+317. column.DataType = System.Type.GetType("System.Double");
+318. column.ColumnName = "Yintercept";
+319. column.ReadOnly = true;
+320. LinRegtable.Columns.Add(column);
+321.
+322. dattypes[3] = "DOUBLE";
+323. Tablenames[3] = "Yintercept";
+324.
+325. column = new DataColumn();
+326. column.DataType = System.Type.GetType("System.Double");
+327. column.ColumnName = "RSquared";
+328. column.ReadOnly = true;
+329. LinRegtable.Columns.Add(column);
+330.
+331. dattypes[4] = "DOUBLE";
+332. Tablenames[4] = "RSquared";
+333.
+334. column = new DataColumn();
+335. column.DataType = System.Type.GetType("System.Double");
+336. column.ColumnName = "ProductMomentCorilation";
+337. column.ReadOnly = true;
+338. LinRegtable.Columns.Add(column);
+339.
+340. dattypes[5] = "DOUBLE";
+341. Tablenames[5] = "ProductMomentCorilation";
+342.
+343. DataColumn[] PrimaryKeyColumns = new DataColumn[1];
+344. PrimaryKeyColumns[0] = LinRegtable.Columns["CustomerID"];
+345. LinRegtable.PrimaryKey = PrimaryKeyColumns;
+346.
+347. Tuple<string[], string[]> arrays = Tuple.Create(Tablenames, dattypes);
+348.
+349. TableNamesDatatypes.Add(LinRegtable, arrays);
+350. }
+351. return LinRegtable;
+352. }
+353. public DataTable CreateLinregTableCustomerID()
+354. {
+355. DataTable LinRegtable = new DataTable("CustomerIDRegresion");
+356. string[] dattypes = new string[6];
+357. string[] Tablenames = new string[6];
+358. {//creating columns
+359. //
+360. DataColumn column; //MoneySpent,InvoiceDate,CustomerID
+361.
+362. column = new DataColumn();
+363. column.DataType = System.Type.GetType("System.String");
+364. column.ColumnName = "CustomerID";
+365. column.ReadOnly = true;
+366. LinRegtable.Columns.Add(column);
+182
+367.
+368. dattypes[0] = "VARCHAR";
+369. Tablenames[0] = "CustomerID";
+370.
+371. column = new DataColumn();
+372. column.DataType = System.Type.GetType("System.Double");
+373. column.ColumnName = "SlopeXsq";
+374. column.ReadOnly = true;
+375. LinRegtable.Columns.Add(column);
+376.
+377. dattypes[1] = "DOUBLE";
+378. Tablenames[1] = "SlopeXsq";
+379.
+380. column = new DataColumn();
+381. column.DataType = System.Type.GetType("System.Double");
+382. column.ColumnName = "SlopeX";
+383. column.ReadOnly = true;
+384. LinRegtable.Columns.Add(column);
+385.
+386. dattypes[2] = "DOUBLE";
+387. Tablenames[2] = "SlopeX";
+388.
+389. column = new DataColumn();
+390. column.DataType = System.Type.GetType("System.Double");
+391. column.ColumnName = "Yintercept";
+392. column.ReadOnly = true;
+393. LinRegtable.Columns.Add(column);
+394.
+395. dattypes[3] = "DOUBLE";
+396. Tablenames[3] = "Yintercept";
+397.
+398. column = new DataColumn();
+399. column.DataType = System.Type.GetType("System.Double");
+400. column.ColumnName = "RSquared";
+401. column.ReadOnly = true;
+402. LinRegtable.Columns.Add(column);
+403.
+404. dattypes[4] = "DOUBLE";
+405. Tablenames[4] = "RSquared";
+406.
+407. column = new DataColumn();
+408. column.DataType = System.Type.GetType("System.Double");
+409. column.ColumnName = "ProductMomentCorilation";
+410. column.ReadOnly = true;
+411. LinRegtable.Columns.Add(column);
+412.
+413. dattypes[5] = "DOUBLE";
+414. Tablenames[5] = "ProductMomentCorilation";
+415.
+416. DataColumn[] PrimaryKeyColumns = new DataColumn[1];
+417. PrimaryKeyColumns[0] = LinRegtable.Columns["CustomerID"];
+418. LinRegtable.PrimaryKey = PrimaryKeyColumns;
+419.
+420. Tuple<string[], string[]> arrays = Tuple.Create(Tablenames, dattypes);
+421.
+422. TableNamesDatatypes.Add(LinRegtable, arrays);
+423. }
+424. return LinRegtable;
+425. }
+426. }
+427. class DataFromSQL
+428. {
+429. public DataTable FindMMPD()
+430. {
+431. {
+432. SQLCon connection = new SQLCon("MoneyMadePerDay");
+433. SQLiteDataReader rdr = connection.reader;
+183
+434. DataTable MMPerday = new DataTable("MoneyMadePerDay");
+435.
+436. DataColumn column;
+437.
+438. column = new DataColumn();
+439. column.DataType = System.Type.GetType("System.Int32");
+440. column.ColumnName = "PrimaryKey"
+;
+441. column.ReadOnly = true
+;
+442. MMPerday.Columns.Add(column);
+443.
+444. column = new DataColumn();
+445. column.DataType = System.Type.GetType("System.Int32");
+446. column.ColumnName = "Day"
+;
+447. column.ReadOnly = true
+;
+448. MMPerday.Columns.Add(column);
+449.
+450. column = new DataColumn();
+451. column.DataType = System.Type.GetType("System.Double");
+452. column.ColumnName = "MoneySpent"
+;
+453. column.ReadOnly = false
+;
+454. MMPerday.Columns.Add(column);
+455.
+456. column = new DataColumn();
+457. column.DataType = System.Type.GetType("System.Int32");
+458. column.ColumnName = "Frequencyofsale"
+;
+459. column.ReadOnly = false
+;
+460. MMPerday.Columns.Add(column);
+461.
+462. column = new DataColumn();
+463. column.DataType = System.Type.GetType("System.Int32");
+464. column.ColumnName = "Year"
+;
+465. column.ReadOnly = false
+;
+466. MMPerday.Columns.Add(column);
+467.
+468. DataRow row;
+469.
+470. while (rdr.Read())
+471.
+{
+472. row = MMPerday.NewRow();
+473. row["PrimaryKey"] = rdr.GetString(
+0);
+474. Console.WriteLine(rdr.GetInt32(
+1));
+475. row["Day"] = rdr.GetInt32(
+1);
+476. row["MoneySpent"] = rdr.GetInt32(
+2);
+477. row["Frequencyofsale"] = rdr.GetInt32(
+3);
+478. row["Year"] = rdr.GetInt32(
+4);
+479.
+480. MMPerday.Rows.Add(row);
+481.
+}
+482. return MMPerday;
+483.
+484.
+}
+485.
+}
+486.
+487. public DataTable CreateMPPertrans()
+488.
+{
+489. DataTable MPPerTrans = new DataTable();
+490.
+491. SQLCon connection = new SQLCon("MPPerTrans");
+492.
+493. SQLiteDataReader rdr = connection.reader;
+494.
+{//creating columns
+495. //
+496. DataColumn column; //MoneySpent,InvoiceDate,CustomerID
+497.
+498. column = new DataColumn();
+499. column.DataType = System.Type.GetType("System.String");
+500. column.ColumnName = "InvoiceNo"
+;
+184
+501. column.ReadOnly = true;
+502. MPPerTrans.Columns.Add(column);
+503.
+504. string[] Tablenames = new string[5];
+505.
+506. string[] dattypes = new string[5];
+507.
+508. dattypes[0] = "VARCHAR";
+509. Tablenames[0] = "InvoiceNo";
+510.
+511. column = new DataColumn();
+512. column.DataType = System.Type.GetType("System.Double");
+513. column.ColumnName = "MoneySpent";
+514. column.ReadOnly = true;
+515. MPPerTrans.Columns.Add(column);
+516.
+517. dattypes[1] = "DOUBLE";
+518. Tablenames[1] = "MoneySpent";
+519.
+520. column = new DataColumn();
+521. column.DataType = System.Type.GetType("System.String");
+522. column.ColumnName = "InvoiceDate";
+523. column.ReadOnly = true;
+524. MPPerTrans.Columns.Add(column);
+525.
+526. dattypes[2] = "VARCHAR";
+527. Tablenames[2] = "InvoiceDate";
+528.
+529. column = new DataColumn();
+530. column.DataType = System.Type.GetType("System.Int32");
+531. column.ColumnName = "CustomerID";
+532. column.ReadOnly = true;
+533. MPPerTrans.Columns.Add(column);
+534.
+535. dattypes[3] = "VARCHAR";
+536. Tablenames[3] = "CustomerID";
+537. DataColumn[] PrimaryKeyColumns = new DataColumn[1];
+538. PrimaryKeyColumns[0] = MPPerTrans.Columns["InvoiceNo"];
+539. MPPerTrans.PrimaryKey = PrimaryKeyColumns;
+540.
+541. column = new DataColumn();
+542. column.DataType = System.Type.GetType("System.Int32");
+543. column.ColumnName = "NumericDate";
+544. column.ReadOnly = true;
+545. MPPerTrans.Columns.Add(column);
+546.
+547. dattypes[4] = "INTAGAR";
+548. Tablenames[4] = "NumericDate";
+549.
+550.
+551. column = new DataColumn();
+552. column.DataType = System.Type.GetType("System.Int32");
+553. column.ColumnName = "Year";
+554. column.ReadOnly = true;
+555. MPPerTrans.Columns.Add(column);
+556.
+557.
+558. }
+559. DataRow row;
+560.
+561. Console.WriteLine(rdr.FieldCount);
+562.
+563. while (rdr.Read())
+564. {
+565.
+566. //
+StockCode,Description,Quantity,InvoiceDate,UnitPrice,CustomerID,Country,InvoiceNo,MoneySpent
+185
+567. row = MPPerTrans.NewRow();
+568.
+569. row["InvoiceNo"] = rdr.GetString(0);
+570. row["MoneySpent"] = rdr.GetDecimal(1);
+571. row["InvoiceDate"] = rdr.GetString(2);
+572. row["CustomerID"] = rdr.GetString(3);
+573. row["NumericDate"] = rdr.GetInt32(4);
+574. row["Year"] = rdr.GetInt32(5);
+575.
+576. MPPerTrans.Rows.Add(row);
+577. }
+578. return MPPerTrans;
+579. }
+580.
+581. public DataTable CreateSpent()
+582. {
+583. DataTable Spent = new DataTable();
+584.
+585. SQLCon connection = new SQLCon("Spent");
+586.
+587. SQLiteDataReader rdr = connection.reader;
+588. {//creating columns
+589. //
+590. DataColumn column; //MoneySpent,InvoiceDate,CustomerID
+591.
+592.
+593. column = new DataColumn();
+594. column.DataType = System.Type.GetType("System.Int32");
+595. column.ColumnName = "PrimaryKey";
+596. column.ReadOnly = true;
+597. Spent.Columns.Add(column);
+598.
+599.
+600.
+601.
+602.
+603. column = new DataColumn();
+604. column.DataType = System.Type.GetType("System.String");
+605. column.ColumnName = "CustomerID";
+606. column.ReadOnly = true;
+607. Spent.Columns.Add(column);
+608.
+609.
+610.
+611.
+612. column = new DataColumn();
+613. column.DataType = System.Type.GetType("System.Double");
+614. column.ColumnName = "MoneySpentOvertime";
+615. column.ReadOnly = true;
+616. Spent.Columns.Add(column);
+617.
+618. DataColumn[] PrimaryKeyColumns = new DataColumn[1];
+619. PrimaryKeyColumns[0] = Spent.Columns["PrimaryKey"];
+620. Spent.PrimaryKey = PrimaryKeyColumns;
+621.
+622.
+623. }
+624. DataRow row;
+625.
+626. while (rdr.Read())
+627. {
+628.
+629. //
+StockCode,Description,Quantity,InvoiceDate,UnitPrice,CustomerID,Country,InvoiceNo,MoneySpent
+630. row = Spent.NewRow();
+631. row["PrimaryKey"] = rdr.GetInt32(0);
+632. row["CustomerID"] = rdr.GetString(1);
+186
+633. row["MoneySpentOvertime"] = rdr.GetDecimal(2);
+634.
+635.
+636. Spent.Rows.Add(row);
+637. }
+638. return Spent;
+639. }
+640.
+641.
+642. }
+643.
+644. class program
+645. {
+646.
+647. static void Main(string[] args)
+648. {
+649. DataFromSQL Tabledata = new DataFromSQL();
+650.
+651. Datacreated creation = new Datacreated();
+652.
+653. DataTable LinregCustomer = creation.CreateLinregTableCustomerID();
+654. DataTable QuatersMoney = creation.CreateLinregTableDays("QuatersMoneyLinReg");
+655. DataTable QuatersFreq= creation.CreateLinregTableDays("QuatersFreqLinReg");
+656.
+657. DataTable MMPerTrans = Tabledata.CreateMPPertrans();
+658. DataTable Spent = Tabledata.CreateSpent();
+659. DataTable MMperDay = Tabledata.FindMMPD();
+660. creation.FillLinregTableCustomer(Spent, MMPerTrans, ref LinregCustomer);
+661. creation.FillLinregTableDays(MMperDay, ref QuatersMoney,ref QuatersFreq);
+662.
+663. creation.SaveToSQL(LinregCustomer);
+664. creation.SaveToSQL(QuatersFreq);
+665. creation.SaveToSQL(QuatersMoney);
+666.
+667. Console.WriteLine("Finished");
+668.
+669. Console.ReadLine();
+670. }
+671. }
+672.
+673. class LinearRegression
+674. {
+675.
+676. private decimal YIntersept;
+677. private decimal Slope;
+678. private decimal QuardraticSlope = 0;
+679. private decimal ProductMomentCorilation;
+680. private decimal R2;
+681.
+682. private bool checkvalid(decimal[] Y, decimal[] X)
+683. {
+684. if (Y.Length > 1)
+685. {
+686. List<decimal> TestforUnique = new List<decimal>();
+687. TestforUnique.Add(Y[0]);
+688. for (int i = 1; i < Y.Length; i++)
+689. {
+690. if (!TestforUnique.Contains(Y[i])) // checks if there are at least 2 different values
+691. {
+692. return true;
+693. }
+694. }
+695. return false;
+696. }
+697. else
+698. {
+699. return false;
+187
+700. }
+701. }
+702.
+703. public LinearRegression(decimal[] Y, decimal[] X)
+704. // we construct the object and create the two equations then compare them and assign the
+better equation to the objects attributes
+705. {
+706.
+707. if (checkvalid(Y, X))
+708. {
+709. if (Y.Length != X.Length)
+710. {
+711. Slope = 0;
+712. YIntersept = 0;
+713. R2 = 0;
+714. ProductMomentCorilation = 0;
+715. }
+716. else if (Y.Length < 3)
+717. {
+718. Slope = 0;
+719. YIntersept = 0;
+720. R2 = 0;
+721. ProductMomentCorilation = 0;
+722. }
+723. else // to compare the validity between Linuear and Quadratic regression of the same data
+724. // analyzing and comparing the residuals is a better test of fit
+725. // R^2 is better for comparing between equations of different data to see which is more
+valid
+726. {
+727. decimal[] Lindata = SimLinRegression(Y, X);
+728. decimal[] QRdata = PolyLinRegression(Y, X);
+729.
+730. decimal LinRSq = GetRSq(Lindata, Y, X);
+731. decimal QrRsq = GetRSq(QRdata, Y, X);
+732.
+733. decimal FitLin = GetResiduals(Lindata, Y, X);
+734. decimal FitQuad = GetResiduals(QRdata, Y, X);
+735.
+736. if (LinRSq < 0.4m && QrRsq > 0.4m) // if R^2 is negative it means that the model fits the
+data worse than a null hypothisis
+737. // so is useless so this test must be completed first to see if
+comparasons are even useful
+738. {
+739. QuardraticSlope = QRdata[0];
+740. Slope = QRdata[1];
+741. YIntersept = QRdata[2];
+742. ProductMomentCorilation = 0; // this statistic is not useful for Non linear data
+743. R2 = QrRsq;
+744. }
+745. else if (LinRSq > 0.4m && QrRsq < 0.4m)
+746. {
+747. Slope = Lindata[1];
+748. YIntersept = Lindata[2];
+749. R2 = LinRSq;
+750. }
+751. else if (LinRSq < 0.4m && QrRsq < 0.4m) // if both are negative both models dont
+function
+752. {
+753.
+754. Slope = 0;
+755. YIntersept = 0;
+756. R2 = 0;
+757. ProductMomentCorilation = 0;
+758. }
+759. else if (Lindata[1] > 0 && QRdata[0] < 0) // if slope of linear is positive and the quadratic
+of QRdata is negative as
+188
+760. // explained in design document wont lead to good
+predictions
+761. {
+762. Slope = Lindata[1];
+763. YIntersept = Lindata[2];
+764. R2 = LinRSq;
+765. }
+766.
+767. else if (Lindata[1] < 0 && QRdata[0] > 0) // same is true of opposite where if there is a
+negative general
+768. // trend and a positive quadratic than the quadratic wont be
+useful at predictions
+769. {
+770. Slope = Lindata[1];
+771. YIntersept = Lindata[2];
+772. R2 = LinRSq;
+773. }
+774. else if (FitLin > FitQuad) // if the quadratic is less than 0.5 than it is not a useful
+predictor
+775. {
+776. Slope = Lindata[1];
+777. YIntersept = Lindata[2];
+778. R2 = LinRSq;
+779. }
+780. else if (FitLin < FitQuad) // if the values dont satisfy the conditions above than lastly test
+if the Quadrati
+781. // c R^2 is larger than Linear's
+782. {
+783. QuardraticSlope = QRdata[0];
+784. Slope = QRdata[1];
+785. YIntersept = QRdata[2];
+786. ProductMomentCorilation = 0;
+787. R2 = QrRsq;
+788. }
+789. else if (LinRSq - QrRsq < 0.2m) // if the R^2 of the quadratic graph is within 0.2 of the
+R^2 of the Linear then
+790. // take the Quadratic as the better predictor
+791. {
+792. QuardraticSlope = QRdata[0];
+793. Slope = QRdata[1];
+794. YIntersept = QRdata[2];
+795. ProductMomentCorilation = 0;
+796. R2 = QrRsq;
+797. }
+798.
+799. else// if no condiction is met go with then the quadratic model is probably not useful but
+the data is functionaal so the
+800. // Linear version is safest to use as these have lower error rates
+801. {
+802. Slope = Lindata[1];
+803. YIntersept = Lindata[2];
+804. R2 = LinRSq;
+805. }
+806. }
+807. }
+808. else
+809. {
+810. QuardraticSlope = 0;
+811. Slope = 0;
+812. YIntersept =0;
+813. ProductMomentCorilation = 0; // this statistic is not useful for Non linear data
+814. R2 =0;
+815. }
+816.
+817. }
+818.
+819. private decimal GetResiduals(decimal[] data,decimal[] Y, decimal[] X)
+189
+820. {
+821.
+822. decimal YIntersept = data[2];
+823. decimal Slope = data[1];
+824. decimal QuardraticSlope = data[0];
+825. decimal SquaredRegression = 0;
+826.
+827. decimal Srvalue;
+828. decimal SOsvalue;
+829. for (int i = 0; i < Y.Length; i++)
+830. {
+831. decimal y = 0;
+832. if (QuardraticSlope == 0)
+833. {
+834. y = (decimal)((decimal)Slope * (decimal)X[i]) + (decimal)YIntersept;
+835. }
+836. else
+837. {
+838. y = ((QuardraticSlope * (X[i] * X[i]))) + (Slope * X[i]) + YIntersept;
+839. }
+840.
+841.
+842.
+843. Srvalue = Y[i] - y;
+844.
+845. Console.WriteLine(Srvalue + " Srvalue");
+846.
+847. Srvalue = Srvalue * Srvalue; // squared to keep pos
+848. SquaredRegression = SquaredRegression + Srvalue;
+849.
+850.
+851. Console.WriteLine(SquaredRegression + " SquaredReg");
+852.
+853.
+854. }//gets Total squares
+855.
+856. return SquaredRegression;
+857. }
+858. private decimal GetRSq(decimal[] data, decimal[] Y, decimal[] X)
+859. {
+860. //R^2 = 1- Sum SquaredRegression / Total SumofSquares
+861.
+862. //for Total SumofSquares you need to find the Mean of Yvalues first
+863. decimal total = 0;
+864. for (int i = 0; i < Y.Length; i++)
+865. {
+866. total = total + Y[i];
+867. }
+868. decimal mean = total / Y.Length;
+869. // then you find the some of the predicted values
+870.
+871. //the some of Squared regression is the difference between the predicted values
+872. //and the values observed then squared so they are always positive
+873. decimal SquaredRegression = 0;
+874. decimal SomeOfSquaares = 0;
+875. decimal Srvalue;
+876. decimal SOsvalue;
+877.
+878. for (int i = 0; i < Y.Length; i++)
+879. {
+880. SOsvalue = Y[i] - mean;
+881.
+882. SOsvalue = SOsvalue * SOsvalue; // squared to keep pos
+883.
+884. SomeOfSquaares = SomeOfSquaares + SOsvalue;
+885. }//gets Total SquaredRegression
+886.
+190
+887. SquaredRegression = GetResiduals(data,Y, X);
+888.
+889. decimal Rsq = 1m - (SquaredRegression / SomeOfSquaares);
+890.
+891. return Rsq;
+892. }
+893.
+894. public decimal[] ReturnValues()
+895. {
+896. decimal[] Values = new decimal[5];
+897. Values[0] = YIntersept;
+898. Values[1] = Slope;
+899. Values[2] = QuardraticSlope;
+900. Values[3] = R2;
+901. Values[4] = ProductMomentCorilation;
+902. return Values;
+903. }
+904.
+905.
+906. private decimal[] PolyLinRegression(decimal[] Y, decimal[] X)
+907. {
+908. //We will be assuming the highest polynomial is 2 so the matrix is 3,3
+909. //***
+910. //[0 1 2]
+911. //[1 2 3]
+912. //[2 3 4]
+913. //values needed N, Sum x , Sum Y , Sum X^2, Sum X^3, Sum X^4
+914.
+915. decimal sumx = 0;
+916. decimal sumy = 0;
+917. decimal sumYX = 0;
+918. decimal sumXsqY = 0;
+919. decimal SumXsq = 0;
+920. decimal SumXcb = 0;
+921. decimal SumXqu = 0;
+922.
+923. for (int i = 0; i < Y.Length; i++)
+924. {
+925. sumx = sumx + X[i];
+926. sumy = sumy + Y[i];
+927.
+928. sumYX = sumYX + (X[i] * Y[i]);
+929.
+930. sumXsqY = sumXsqY + ((X[i] * X[i]) * Y[i]);
+931.
+932. SumXsq = SumXsq + (X[i] * X[i]); ;
+933.
+934. SumXcb = SumXcb + (X[i] * X[i] * X[i]);
+935.
+936. SumXqu = SumXqu + (X[i] * X[i] * X[i] * X[i]);
+937. }
+938.
+939. //M
+940. decimal[,] Matrix = new decimal[3, 3]
+941. {
+942. {Y.Length, sumx,SumXsq },
+943. { sumx,SumXsq,SumXcb },
+944. {SumXsq, SumXcb,SumXqu }
+945. };
+946. // Now we generate M0, M1 and M2
+947. decimal[,] M0 = new decimal[3, 3]
+948. {
+949. {Y.Length, sumx,SumXsq },
+950. { sumx,SumXsq,SumXcb },
+951. {SumXsq, SumXcb,SumXqu }
+952. };
+953.
+191
+954. M0[0, 0] = sumy;
+955. M0[0, 1] = sumYX;
+956. M0[0, 2] = sumXsqY;
+957.
+958. decimal[,] M1 = new decimal[3, 3]
+959. {
+960. {Y.Length, sumx,SumXsq },
+961. { sumx,SumXsq,SumXcb },
+962. {SumXsq, SumXcb,SumXqu }
+963. };
+964. M1[1, 0] = sumy;
+965. M1[1, 1] = sumYX;
+966. M1[1, 2] = sumXsqY;
+967.
+968. decimal[,] M2 = new decimal[3, 3]
+969. {
+970. {Y.Length, sumx,SumXsq },
+971. { sumx,SumXsq,SumXcb },
+972. {SumXsq, SumXcb,SumXqu }
+973. };
+974. M2[2, 0] = sumy;
+975. M2[2, 1] = sumYX;
+976. M2[2, 2] = sumXsqY;
+977.
+978. // we now apply Cramers Rule --- ak = Det(Mi)/det(M)
+979. // Now we find the determiate of these functions
+980. // this has to be completed for each of the 3 metricies
+981.
+982. decimal detM0 = FindDeterminate(M0);
+983. decimal detM1 = FindDeterminate(M1);
+984. decimal detM2 = FindDeterminate(M2);
+985. decimal detM = FindDeterminate(Matrix);
+986.
+987. // a2 = X^2 a1 = X a0 = Y intercept
+988.
+989. decimal a0 = detM0 / detM;
+990. decimal a1 = detM1 / detM;
+991. decimal a2 = detM2 / detM;
+992.
+993. decimal[] data = new decimal[3];
+994.
+995. data[0] = a2;
+996. data[1] = a1;
+997. data[2] = a0;
+998. return data;
+999. }
+1000.
+1001. private decimal FindDeterminate(decimal[,] Matrix)
+1002. {
+1003. decimal determiate = 0;
+1004. // |D|=
+1005. //[a1, b1, c1]
+1006. //[a2, b2, c2]
+1007. //[a3, b3, c3]
+1008. //=
+1009. //a1[b2, c2] - b1[a2, c2] + c1[a2, b2]
+1010. // [b3, c3] [a3, c3] [a3, b3]
+1011.
+1012. //a1(b2)(c3) - a1(b3)(c2) + b1(c2)(a3) - b1(a2)(c3) + c1(a2)(b3) - c1(a3)(b2)
+1013. //A B C
+1014. //I broke down this equation into 3 more digestible ones
+1015.
+1016.
+1017.
+1018. decimal A = ((Matrix[0, 0]) * (Matrix[1, 1]) * (Matrix[2, 2])) - ((Matrix[0, 0]) * (Matrix[1,
+2]) * (Matrix[2, 1]));
+192
+1019. decimal B = ((Matrix[1, 0]) * (Matrix[2, 1]) * (Matrix[0, 2])) - ((Matrix[1, 0]) * (Matrix[0,
+1]) * (Matrix[2, 2]));
+1020. decimal C = ((Matrix[2, 0]) * (Matrix[0, 1]) * (Matrix[1, 2])) - ((Matrix[2, 0]) *
+(Matrix[0, 2]) * (Matrix[1, 1]));
+1021.
+1022.
+1023. determiate = A + B + C;
+1024. return determiate;
+1025. }
+1026.
+1027. private decimal[] SimLinRegression(decimal[] Y, decimal[] X)
+1028. {
+1029. //utalizes a non matrix formula to increase proformance as this produces the same
+simple
+1030. //Linear regression equation through a more manual math model that only works
+for
+1031. //Simple equations
+1032. decimal sumx = 0;
+1033. decimal sumy = 0;
+1034. decimal SumXsq = 0;
+1035. decimal SumYsq = 0;
+1036. decimal SumXY = 0;
+1037.
+1038. for (int i = 0; i < Y.Length; i++)
+1039. {
+1040. sumx = sumx + X[i];
+1041. sumy = sumy + Y[i];
+1042.
+1043. SumXsq = SumXsq + (X[i] * X[i]);
+1044. SumYsq = SumYsq + (Y[i] * Y[i]);
+1045.
+1046. SumXY = SumXY + (X[i] * Y[i]);
+1047. }
+1048.
+1049. decimal B1 = (Y.Length * SumXY) - (sumx * sumy);
+1050. decimal B2 = (Y.Length * SumXsq) - (sumx * sumx);
+1051. decimal B = B1 / B2;
+1052. //Split up equation for debugging
+1053. //B = Coeffienent A = Y intersept
+1054.
+1055. decimal a1 = (decimal)(1m / Y.Length) * sumy;
+1056. decimal a2 = (B * (decimal)(1m / Y.Length) * sumx);
+1057. decimal A = a1 - a2;
+1058.
+1059. // Now we work out Product Moment corrilation
+1060.
+1061. decimal ProdMomCorl1 = Y.Length * SumXY - (sumx * sumy);
+1062. decimal ProdMomCorl2 = ((Y.Length * SumXsq) - (sumx * sumx)) * ((Y.Length *
+SumYsq) - (sumy * sumy));
+1063. ProdMomCorl2 =
+Convert.ToDecimal(Math.Sqrt(Convert.ToDouble(ProdMomCorl2)));
+1064. decimal ProdMomCorl = ProdMomCorl1 / ProdMomCorl2;
+1065.
+1066. decimal[] data = new decimal[3];
+1067. data[0] = 0;
+1068. data[1] = B;
+1069. data[2] = A;
+1070.
+1071. ProductMomentCorilation = ProdMomCorl;
+1072. return data;
+1073.
+1074. }
+1075.
+1076. }
+1077. }
+1078.
